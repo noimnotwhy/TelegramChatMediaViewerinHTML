@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Chat Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #1a1a1a;
+    --surface2: #222;
+    --surface3: #2a2a2a;
+    --border: #2e2e2e;
+    --accent: #2AABEE;
+    --accent2: #1e8fcf;
+    --sent: #2b5278;
+    --sent-text: #e8f4fd;
+    --recv: #1e1e1e;
+    --recv-text: #e8e8e8;
+    --muted: #666;
+    --text: #e8e8e8;
+    --text2: #aaa;
+    --green: #4caf50;
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── UPLOAD SCREEN ── */
+  #upload-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 40px;
+    background: radial-gradient(ellipse at 50% 40%, #1a2a3a 0%, #0e0e0e 70%);
+  }
+
+  .logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-icon {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    box-shadow: 0 0 60px rgba(42,171,238,0.25);
+  }
+
+  .logo h1 {
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: #fff;
+  }
+
+  .logo p {
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    max-width: 360px;
+    line-height: 1.6;
+  }
+
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 600px;
+  }
+
+  .upload-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .upload-card:hover {
+    border-color: var(--accent);
+    background: var(--surface2);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(42,171,238,0.12);
+  }
+
+  .upload-card.has-file {
+    border-color: var(--green);
+    background: rgba(76,175,80,0.08);
+  }
+
+  .upload-card input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .card-icon { font-size: 28px; }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .card-status { font-size: 11px; color: var(--green); font-weight: 500; margin-top: 4px; }
+
+  .launch-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 48px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 24px rgba(42,171,238,0.3);
+  }
+
+  .launch-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(42,171,238,0.4); }
+  .launch-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.8;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+
+  .hint code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface3);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* ── CHAT APP ── */
+  #app {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* Header */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .back-btn {
+    background: none; border: none; color: var(--accent);
+    cursor: pointer; font-size: 18px; padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: rgba(42,171,238,0.1); }
+
+  .chat-avatar {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--accent), #6c5ce7);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+
+  .chat-info { flex: 1; }
+  .chat-name { font-size: 16px; font-weight: 600; }
+  .chat-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  .search-wrap {
+    display: flex; align-items: center;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 12px;
+    gap: 8px;
+  }
+
+  .search-wrap input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-size: 13px; width: 160px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .search-wrap input::placeholder { color: var(--muted); }
+
+  /* Messages area */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    scroll-behavior: smooth;
+  }
+
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Date separator */
+  .date-sep {
+    display: flex; align-items: center; gap: 12px;
+    margin: 16px 0 8px;
+  }
+
+  .date-sep-line { flex: 1; height: 1px; background: var(--border); }
+  .date-sep-label {
+    font-size: 11px; color: var(--muted);
+    background: var(--surface3);
+    padding: 3px 12px; border-radius: 20px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* Message bubble */
+  .msg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin: 1px 0;
+    max-width: 100%;
+  }
+
+  .msg-row.sent { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+
+  .bubble {
+    max-width: min(480px, 72%);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    position: relative;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .msg-row.sent .bubble {
+    background: var(--sent);
+    color: var(--sent-text);
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-row.recv .bubble {
+    background: var(--recv);
+    color: var(--recv-text);
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .msg-row.sent + .msg-row.sent .bubble { border-bottom-right-radius: var(--radius); }
+  .msg-row.sent + .msg-row.sent:last-of-type .bubble,
+  .msg-row.sent:has(+ .msg-row.recv) .bubble { border-bottom-right-radius: 4px; }
+
+  .bubble-sender {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 3px;
+  }
+
+  .bubble-text { font-size: 14px; }
+
+  .bubble-time {
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .msg-row.recv .bubble-time { color: var(--muted); }
+
+  /* Media in bubble */
+  .media-thumb {
+    border-radius: 12px;
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .media-thumb:hover { opacity: 0.88; }
+
+  .video-wrap {
+    position: relative; display: inline-block;
+    border-radius: 12px; overflow: hidden;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .video-wrap video {
+    display: block;
+    max-width: 100%;
+    max-height: 280px;
+  }
+
+  .play-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.35);
+    transition: opacity 0.15s;
+  }
+
+  .play-btn-icon {
+    width: 52px; height: 52px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    backdrop-filter: blur(4px);
+  }
+
+  .file-attach {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: background 0.15s;
+  }
+
+  .file-attach:hover { background: rgba(255,255,255,0.1); }
+  .file-icon { font-size: 24px; }
+  .file-info { display: flex; flex-direction: column; }
+  .file-name { font-size: 13px; font-weight: 500; }
+  .file-size { font-size: 11px; color: var(--muted); }
+
+  .sticker-img {
+    width: 150px; height: 150px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .audio-player {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 8px 14px;
+    margin-bottom: 4px;
+    min-width: 200px;
+  }
+
+  .audio-player audio { display: none; }
+  .audio-play-btn {
+    width: 34px; height: 34px;
+    background: var(--accent);
+    border-radius: 50%; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+    color: #fff;
+  }
+
+  .audio-label { font-size: 12px; color: var(--text2); }
+
+  /* Highlighted / search match */
+  .highlight { background: rgba(42,171,238,0.35); border-radius: 3px; }
+
+  /* ── MEDIA VIEWER ── */
+  #viewer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+  }
+
+  #viewer.open { display: flex; }
+
+  .viewer-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+    z-index: 2;
+  }
+
+  .viewer-close {
+    background: rgba(255,255,255,0.12);
+    border: none; color: #fff;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    cursor: pointer; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+
+  .viewer-close:hover { background: rgba(255,255,255,0.22); }
+
+  .viewer-meta { display: flex; flex-direction: column; }
+  .viewer-sender { font-size: 15px; font-weight: 600; }
+  .viewer-date { font-size: 12px; color: rgba(255,255,255,0.5); }
+
+  .viewer-media {
+    max-width: 90vw;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+  }
+
+  .viewer-video {
+    max-width: 90vw;
+    max-height: 80vh;
+    border-radius: 12px;
+    outline: none;
+  }
+
+  .viewer-nav {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.1);
+    border: none; color: #fff;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    cursor: pointer; font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    backdrop-filter: blur(4px);
+  }
+
+  .viewer-nav:hover { background: rgba(255,255,255,0.22); }
+  .viewer-nav.prev { left: 20px; }
+  .viewer-nav.next { right: 20px; }
+
+  .viewer-caption {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 16px 24px;
+    text-align: center;
+    font-size: 14px;
+    color: rgba(255,255,255,0.75);
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  }
+
+  .viewer-counter {
+    position: absolute;
+    bottom: 60px;
+    left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(255,255,255,0.4);
+  }
+
+  /* Jump to bottom */
+  .jump-btn {
+    position: fixed;
+    bottom: 80px; right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    z-index: 20;
+    transition: all 0.15s;
+  }
+  .jump-btn:hover { background: var(--surface3); transform: scale(1.1); }
+  .jump-btn.visible { display: flex; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex; gap: 20px; align-items: center;
+    padding: 8px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .stat { display: flex; align-items: center; gap: 5px; }
+  .stat span:first-child { font-size: 13px; }
+
+  /* Scrollbar & misc */
+  .sender-color { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+
+  /* Missing media badge */
+  .missing-media {
+    background: rgba(255,255,255,0.05);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  /* Emoji-only messages */
+  .emoji-only .bubble-text { font-size: 36px; line-height: 1.2; }
+  .emoji-only .bubble { background: transparent !important; border: none !important; padding: 4px 8px; }
+</style>
+</head>
+<body>
+
+<!-- Upload Screen -->
+<div id="upload-screen">
+  <div class="logo">
+    <div class="logo-icon">✈️</div>
+    <h1>TELEGRAM VIEWER</h1>
+    <p>Upload your exported Telegram chat CSV and media folder to replay your conversation exactly as it was.</p>
+  </div>
+
+  <div class="upload-grid">
+    <label class="upload-card" id="csv-card">
+      <input type="file" id="csv-input" accept=".csv,.tsv">
+      <div class="card-icon">📄</div>
+      <div class="card-title">Chat CSV</div>
+      <div class="card-sub">The exported messages file.<br>Usually <code>messages.csv</code> from Telegram Desktop export.</div>
+      <div class="card-status" id="csv-status"></div>
+    </label>
+
+    <label class="upload-card" id="media-card">
+      <input type="file" id="media-input" multiple accept="image/*,video/*,audio/*,.gif,.webp,.ogg,.mp4,.mov,.avi,.mkv,.pdf,.zip,.webm">
+      <div class="card-icon">🗂️</div>
+      <div class="card-title">Media Files</div>
+      <div class="card-sub">Select all files from your <code>photos/</code>, <code>video/</code> and other media folders at once.</div>
+      <div class="card-status" id="media-status"></div>
+    </label>
+  </div>
+
+  <button class="launch-btn" id="launch-btn" disabled>Open Chat →</button>
+
+  <div class="hint">
+    <strong>How to export from Telegram Desktop:</strong><br>
+    Open chat → ⋮ Menu → Export chat history<br>
+    Format: <code>Machine-readable JSON</code> or <code>CSV</code> · Include media<br>
+    Then select the <code>result.csv</code> and all files from the export folder here.
+    <br><br>
+    <strong>Expected CSV columns (flexible):</strong><br>
+    <code>date</code> · <code>from</code> · <code>text</code> · <code>media</code> (filename or path)
+  </div>
+</div>
+
+<!-- Chat App -->
+<div id="app">
+  <div class="chat-header">
+    <button class="back-btn" id="back-btn" title="Back to upload">←</button>
+    <div class="chat-avatar" id="header-avatar">💬</div>
+    <div class="chat-info">
+      <div class="chat-name" id="chat-name">Chat</div>
+      <div class="chat-sub" id="chat-sub">0 messages</div>
+    </div>
+    <div class="header-actions">
+      <div class="search-wrap">
+        <span style="color:var(--muted);font-size:14px">🔍</span>
+        <input type="text" id="search-input" placeholder="Search messages…">
+      </div>
+    </div>
+  </div>
+
+  <div id="messages"></div>
+
+  <button class="jump-btn" id="jump-btn" title="Jump to bottom">↓</button>
+
+  <div class="stats-bar" id="stats-bar"></div>
+</div>
+
+<!-- Media Viewer -->
+<div id="viewer">
+  <div class="viewer-top">
+    <button class="viewer-close" id="viewer-close">✕</button>
+    <div class="viewer-meta">
+      <div class="viewer-sender" id="viewer-sender"></div>
+      <div class="viewer-date" id="viewer-date"></div>
+    </div>
+  </div>
+  <button class="viewer-nav prev" id="viewer-prev">‹</button>
+  <img id="viewer-img" class="viewer-media" style="display:none">
+  <video id="viewer-vid" class="viewer-video" controls style="display:none"></video>
+  <button class="viewer-nav next" id="viewer-next">›</button>
+  <div class="viewer-counter" id="viewer-counter"></div>
+  <div class="viewer-caption" id="viewer-caption"></div>
+</div>
+
+<script>
+var mediaMap={}, mediaMapById={}, messages=[], mediaItems=[], viewerIdx=0, senderColors={}, colorIdx=0;
+var PALETTE=['#2AABEE','#6c5ce7','#fd79a8','#00b894','#e17055','#a29bfe','#fdcb6e','#00cec9','#e84393','#55efc4'];
+
+function parseCSV(text){
+  var lines=text.split(/\r?\n/);
+  if(!lines.length)return[];
+  var first=lines[0];
+  var delim=first.indexOf('\t')!==-1?'\t':',';
+  function parseLine(line){
+    var fields=[],cur='',inQ=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+      else if(c===delim&&!inQ){fields.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+  var raw=parseLine(lines[0]);
+  var headers=raw.map(function(h){return h.toLowerCase().replace(/[^a-z0-9]/g,'');});
+  var rows=[];
+  for(var i=1;i<lines.length;i++){
+    if(!lines[i].trim())continue;
+    var vals=parseLine(lines[i]);
+    var obj={};
+    headers.forEach(function(h,idx){obj[h]=(vals[idx]||'').trim();});
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function normalise(row){
+  function get(){
+    for(var i=0;i<arguments.length;i++){var k=arguments[i];if(row[k]!==undefined&&row[k]!=='')return row[k];}
+    return'';
+  }
+  var dateRaw=get('date','datetime','timestamp','time','createdat','sentat');
+  var from=get('from','sender','author','name','fromname','user','fromusername');
+  var text=get('message','text','body','content','msg','caption');
+  var mediaId=get('messageid','id','msgid');
+  var fileName=get('filename','filepath','file_name','file','photo','attachment');
+  var mediaType=get('mediatype','media_type','documenttype','kind','messagetype');
+  var date=null;
+  if(dateRaw){try{date=new Date(dateRaw);if(isNaN(date))date=null;}catch(e){}}
+  var mt=(mediaType||'').toLowerCase();
+  var hasMedia=!!(fileName||(mt&&(mt.indexOf('media')!==-1||mt.indexOf('photo')!==-1||mt.indexOf('video')!==-1||mt.indexOf('audio')!==-1||mt.indexOf('document')!==-1||mt.indexOf('gif')!==-1)));
+  return{dateRaw:dateRaw,date:date,from:from||'Unknown',text:text,mediaId:mediaId,fileName:fileName,mediaType:mediaType,hasMedia:hasMedia};
+}
+
+function indexFiles(files){
+  mediaMap={};mediaMapById={};
+  files.forEach(function(f){
+    var base=f.name.split('/').pop().split('\\').pop();
+    var url=URL.createObjectURL(f);
+    var dotIdx=base.lastIndexOf('.');
+    var ext=dotIdx!==-1?base.slice(dotIdx+1).toLowerCase():'';
+    var stem=dotIdx!==-1?base.slice(0,dotIdx):base;
+    var entry={url:url,name:base,ext:ext};
+    mediaMap[base.toLowerCase()]=entry;
+    mediaMap[stem.toLowerCase()]=entry;
+    var nums=stem.match(/\d{4,}/g);
+    if(nums)nums.forEach(function(n){if(!mediaMapById[n])mediaMapById[n]=entry;});
+  });
+}
+
+function resolveMedia(msg){
+  if(msg.fileName){
+    var base=msg.fileName.split('/').pop().split('\\').pop().toLowerCase();
+    if(mediaMap[base])return mediaMap[base];
+    var stem=base.slice(0,base.lastIndexOf('.'));
+    if(mediaMap[stem])return mediaMap[stem];
+  }
+  if(msg.mediaId){
+    var id=String(msg.mediaId).trim();
+    if(mediaMapById[id])return mediaMapById[id];
+    for(var k in mediaMap){if(k.indexOf(id)!==-1)return mediaMap[k];}
+  }
+  return null;
+}
+
+function isImage(e){return['jpg','jpeg','png','gif','webp','bmp','svg','tiff','avif'].indexOf(e)!==-1;}
+function isVideo(e){return['mp4','webm','mov','avi','mkv','m4v'].indexOf(e)!==-1;}
+function isAudio(e){return['mp3','ogg','oga','opus','wav','m4a','aac','flac'].indexOf(e)!==-1;}
+
+function extFromMT(mt){
+  if(!mt)return null;
+  var m=mt.toLowerCase();
+  if(m.indexOf('photo')!==-1||m.indexOf('image')!==-1)return'jpg';
+  if(m.indexOf('video')!==-1)return'mp4';
+  if(m.indexOf('audio')!==-1||m.indexOf('voice')!==-1)return'ogg';
+  if(m.indexOf('gif')!==-1)return'gif';
+  return'bin';
+}
+
+function missingEl(name,kind){
+  var d=document.createElement('div');d.className='missing-media';
+  var icons={image:'🖼️',video:'🎬',audio:'🎵'};
+  var ic=icons[kind]||'📁';
+  var sp1=document.createElement('span');sp1.textContent=ic;
+  var sp2=document.createElement('span');sp2.style.opacity='0.7';sp2.style.fontSize='11px';sp2.textContent=name;
+  var sp3=document.createElement('span');sp3.style.marginLeft='auto';sp3.style.opacity='0.4';sp3.style.fontSize='10px';sp3.textContent='file not loaded';
+  d.appendChild(sp1);d.appendChild(sp2);d.appendChild(sp3);
+  return d;
+}
+
+function buildMedia(msg,bubble){
+  if(!msg.hasMedia)return false;
+  var resolved=resolveMedia(msg);
+  var url=resolved?resolved.url:null;
+  var ext=resolved?resolved.ext:(msg.fileName?msg.fileName.split('.').pop().toLowerCase():extFromMT(msg.mediaType));
+  var displayName=resolved?resolved.name:(msg.fileName||('media_'+msg.mediaId));
+  var mt=(msg.mediaType||'').toLowerCase();
+
+  if(isImage(ext)||mt.indexOf('photo')!==-1){
+    if(url){
+      var img=document.createElement('img');
+      img.src=url;img.className='media-thumb';img.loading='lazy';
+      var vi=mediaItems.indexOf(msg);
+      img.onclick=function(){openViewer(vi);};
+      bubble.appendChild(img);
+    }else{bubble.appendChild(missingEl(displayName,'image'));}
+    return true;
+  }
+  if(isVideo(ext)||mt.indexOf('video')!==-1||mt.indexOf('gif')!==-1){
+    if(url){
+      var wrap=document.createElement('div');wrap.className='video-wrap';
+      var vid=document.createElement('video');vid.src=url;vid.preload='metadata';
+      var ov=document.createElement('div');ov.className='play-overlay';
+      var pb=document.createElement('div');pb.className='play-btn-icon';pb.textContent='\u25B6';
+      ov.appendChild(pb);wrap.appendChild(vid);wrap.appendChild(ov);
+      var vi2=mediaItems.indexOf(msg);
+      wrap.onclick=function(){openViewer(vi2);};
+      bubble.appendChild(wrap);
+    }else{bubble.appendChild(missingEl(displayName,'video'));}
+    return true;
+  }
+  if(isAudio(ext)||mt.indexOf('audio')!==-1||mt.indexOf('voice')!==-1){
+    var awrap=document.createElement('div');awrap.className='audio-player';
+    var btn=document.createElement('button');btn.className='audio-play-btn';btn.textContent='\u25B6';
+    var lbl=document.createElement('div');lbl.className='audio-label';lbl.textContent=displayName;
+    awrap.appendChild(btn);awrap.appendChild(lbl);
+    if(url){
+      var audio=new Audio(url);
+      btn.onclick=function(ev){
+        ev.stopPropagation();
+        if(audio.paused){audio.play();btn.textContent='\u23F8';}
+        else{audio.pause();btn.textContent='\u25B6';}
+        audio.onended=function(){btn.textContent='\u25B6';};
+      };
+    }else{btn.disabled=true;btn.style.opacity='0.4';lbl.style.color='var(--muted)';lbl.textContent+=' (not loaded)';}
+    bubble.appendChild(awrap);
+    return true;
+  }
+  var fw=document.createElement('div');fw.className='file-attach';
+  var fi=document.createElement('div');fi.className='file-icon';
+  fi.textContent=ext==='pdf'?'📑':(ext==='zip'||ext==='rar'?'🗜️':'📎');
+  var finfo=document.createElement('div');finfo.className='file-info';
+  var fn=document.createElement('div');fn.className='file-name';fn.textContent=displayName;
+  finfo.appendChild(fn);
+  if(!url){var fs2=document.createElement('div');fs2.className='file-size';fs2.style.color='var(--muted)';fs2.textContent='Not loaded';finfo.appendChild(fs2);}
+  fw.appendChild(fi);fw.appendChild(finfo);
+  if(url)fw.onclick=function(){var a=document.createElement('a');a.href=url;a.download=displayName;a.click();};
+  bubble.appendChild(fw);
+  return true;
+}
+
+function colorFor(name){
+  if(!senderColors[name]){senderColors[name]=PALETTE[colorIdx%PALETTE.length];colorIdx++;}
+  return senderColors[name];
+}
+
+function fmtTime(d){if(!d)return'';return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function fmtDate(d){if(!d)return'Unknown Date';return d.toLocaleDateString([],{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function sameDay(a,b){if(!a||!b)return false;return a.toDateString()===b.toDateString();}
+function isEmojiOnly(t){
+  if(!t||!t.trim()||t.trim().length>12)return false;
+  return Array.from(t.trim()).every(function(ch){return ch.codePointAt(0)>127||ch===' ';});
+}
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+
+var firstSender='';
+function renderMessages(msgs,query){
+  query=query||'';
+  var container=document.getElementById('messages');
+  container.innerHTML='';
+  if(!msgs.length){
+    var empty=document.createElement('div');
+    empty.style.cssText='text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;';
+    empty.textContent='No messages found.';
+    container.appendChild(empty);
+    return;
+  }
+  if(!firstSender){for(var fi=0;fi<msgs.length;fi++){if(msgs[fi].from){firstSender=msgs[fi].from;break;}}}
+  var lastDate=null;
+  msgs.forEach(function(msg){
+    if(!sameDay(lastDate,msg.date)){
+      var sep=document.createElement('div');sep.className='date-sep';
+      var l1=document.createElement('div');l1.className='date-sep-line';
+      var lb=document.createElement('div');lb.className='date-sep-label';lb.textContent=fmtDate(msg.date);
+      var l2=document.createElement('div');l2.className='date-sep-line';
+      sep.appendChild(l1);sep.appendChild(lb);sep.appendChild(l2);
+      container.appendChild(sep);
+      lastDate=msg.date;
+    }
+    var isSent=msg.from===firstSender;
+    var row=document.createElement('div');
+    row.className='msg-row '+(isSent?'sent':'recv');
+    if(!isSent){
+      var av=document.createElement('div');av.className='msg-avatar';
+      av.textContent=(msg.from||'?')[0].toUpperCase();
+      av.style.background='linear-gradient(135deg,'+colorFor(msg.from)+','+colorFor(msg.from)+'88)';
+      row.appendChild(av);
+    }
+    var emojiOnly=!msg.hasMedia&&isEmojiOnly(msg.text);
+    var bubble=document.createElement('div');
+    bubble.className='bubble'+(emojiOnly?' emoji-only':'');
+    if(!isSent){
+      var sl=document.createElement('div');sl.className='bubble-sender';
+      sl.style.color=colorFor(msg.from);sl.textContent=msg.from;
+      bubble.appendChild(sl);
+    }
+    buildMedia(msg,bubble);
+    if(msg.text){
+      var textEl=document.createElement('div');textEl.className='bubble-text';
+      var t=escHtml(msg.text);
+      if(query){
+        var re=new RegExp(escRe(query),'gi');
+        t=t.replace(re,function(m){return '<mark class="highlight">'+m+'<\/mark>';});
+      }
+      textEl.innerHTML=t.replace(/\n/g,'<br>');
+      bubble.appendChild(textEl);
+    }
+    var timeEl=document.createElement('div');timeEl.className='bubble-time';timeEl.textContent=fmtTime(msg.date);
+    bubble.appendChild(timeEl);
+    row.appendChild(bubble);
+    container.appendChild(row);
+  });
+}
+
+function openViewer(idx){
+  if(idx<0||idx>=mediaItems.length)return;
+  viewerIdx=idx;
+  var msg=mediaItems[idx];
+  var resolved=resolveMedia(msg);
+  if(!resolved)return;
+  document.getElementById('viewer-sender').textContent=msg.from;
+  document.getElementById('viewer-date').textContent=msg.date?msg.date.toLocaleString():'';
+  document.getElementById('viewer-caption').textContent=msg.text||'';
+  document.getElementById('viewer-counter').textContent=(idx+1)+' / '+mediaItems.length;
+  var img=document.getElementById('viewer-img');
+  var vid=document.getElementById('viewer-vid');
+  img.style.display='none';vid.style.display='none';
+  vid.pause();vid.src='';
+  if(isVideo(resolved.ext)){vid.src=resolved.url;vid.style.display='block';}
+  else{img.src=resolved.url;img.style.display='block';}
+  document.getElementById('viewer').classList.add('open');
+}
+
+function closeViewer(){
+  document.getElementById('viewer').classList.remove('open');
+  var vid=document.getElementById('viewer-vid');vid.pause();vid.src='';
+}
+
+document.getElementById('viewer-close').onclick=closeViewer;
+document.addEventListener('keydown',function(e){
+  if(!document.getElementById('viewer').classList.contains('open'))return;
+  if(e.key==='Escape')closeViewer();
+  if(e.key==='ArrowLeft'){viewerIdx=Math.max(0,viewerIdx-1);openViewer(viewerIdx);}
+  if(e.key==='ArrowRight'){viewerIdx=Math.min(mediaItems.length-1,viewerIdx+1);openViewer(viewerIdx);}
+});
+document.getElementById('viewer-prev').onclick=function(){viewerIdx=Math.max(0,viewerIdx-1);openViewer(viewerIdx);};
+document.getElementById('viewer-next').onclick=function(){viewerIdx=Math.min(mediaItems.length-1,viewerIdx+1);openViewer(viewerIdx);};
+document.getElementById('viewer').addEventListener('click',function(e){if(e.target===document.getElementById('viewer'))closeViewer();});
+
+var searchTimer;
+document.getElementById('search-input').addEventListener('input',function(e){
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(function(){
+    var q=e.target.value.trim();
+    var filtered=q?messages.filter(function(m){return(m.text||'').toLowerCase().indexOf(q.toLowerCase())!==-1||(m.from||'').toLowerCase().indexOf(q.toLowerCase())!==-1;}):messages;
+    firstSender='';
+    renderMessages(filtered,q);
+  },250);
+});
+
+var msgsEl=document.getElementById('messages');
+var jumpBtn=document.getElementById('jump-btn');
+msgsEl.addEventListener('scroll',function(){
+  var atBottom=msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight<100;
+  jumpBtn.classList.toggle('visible',!atBottom);
+});
+jumpBtn.onclick=function(){msgsEl.scrollTo({top:msgsEl.scrollHeight,behavior:'smooth'});};
+
+document.getElementById('back-btn').onclick=function(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
+  messages=[];mediaMap={};mediaMapById={};mediaItems=[];senderColors={};colorIdx=0;firstSender='';
+  document.getElementById('csv-status').textContent='';
+  document.getElementById('media-status').textContent='';
+  document.getElementById('csv-card').classList.remove('has-file');
+  document.getElementById('media-card').classList.remove('has-file');
+  document.getElementById('launch-btn').disabled=true;
+  document.getElementById('csv-input').value='';
+  document.getElementById('media-input').value='';
+};
+
+var csvFile=null;
+document.getElementById('csv-input').addEventListener('change',function(e){
+  csvFile=e.target.files[0];
+  if(csvFile){
+    document.getElementById('csv-status').textContent='\u2713 '+csvFile.name;
+    document.getElementById('csv-card').classList.add('has-file');
+    checkReady();
+  }
+});
+
+document.getElementById('media-input').addEventListener('change',function(e){
+  var files=Array.from(e.target.files);
+  indexFiles(files);
+  document.getElementById('media-status').textContent='\u2713 '+files.length+' file'+(files.length!==1?'s':'')+' loaded';
+  document.getElementById('media-card').classList.add('has-file');
+  checkReady();
+});
+
+function checkReady(){document.getElementById('launch-btn').disabled=!csvFile;}
+
+document.getElementById('launch-btn').addEventListener('click',function(){
+  if(!csvFile)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var rows=parseCSV(e.target.result);
+    if(!rows.length){alert('Could not parse CSV. Please check the file format.');return;}
+    messages=rows.map(function(r,i){var m=normalise(r);m._idx=i;return m;});
+    messages.sort(function(a,b){return(a.date?a.date.getTime():0)-(b.date?b.date.getTime():0);});
+    mediaItems=messages.filter(function(m){
+      if(!m.hasMedia)return false;
+      var r=resolveMedia(m);
+      if(r)return isImage(r.ext)||isVideo(r.ext);
+      var mt=(m.mediaType||'').toLowerCase();
+      return mt.indexOf('photo')!==-1||mt.indexOf('video')!==-1||mt.indexOf('gif')!==-1;
+    });
+    var senders=[];
+    messages.forEach(function(m){if(m.from&&senders.indexOf(m.from)===-1)senders.push(m.from);});
+    var withMedia=messages.filter(function(m){return m.hasMedia;}).length;
+    document.getElementById('chat-name').textContent=senders.length<=2?senders.join(' & '):'Group Chat ('+senders.length+')';
+    document.getElementById('chat-sub').textContent=messages.length.toLocaleString()+' messages';
+    var sb=document.getElementById('stats-bar');
+    sb.innerHTML='';
+    function stat(icon,txt){var d=document.createElement('div');d.className='stat';var s1=document.createElement('span');s1.textContent=icon;var s2=document.createElement('span');s2.textContent=txt;d.appendChild(s1);d.appendChild(s2);sb.appendChild(d);}
+    stat('\uD83D\uDCAC',messages.length.toLocaleString()+' messages');
+    stat('\uD83D\uDC65',senders.length+' participant'+(senders.length!==1?'s':''));
+    stat('\uD83D\uDDBC\uFE0F',withMedia+' with media');
+    if(messages[0]&&messages[0].date)stat('\uD83D\uDCC5',fmtDate(messages[0].date)+' \u2192 '+fmtDate(messages[messages.length-1].date));
+    firstSender='';
+    renderMessages(messages,'');
+    document.getElementById('upload-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    requestAnimationFrame(function(){msgsEl.scrollTop=msgsEl.scrollHeight;});
+  };
+  reader.readAsText(csvFile);
+});
+</script>
+</body>
+</html>
